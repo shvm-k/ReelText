@@ -1,0 +1,10 @@
+# Local-only dev scaffolding
+venv/
+.localbin/
+__pycache__/
+*.pyc
+.DS_Store
+.claude/
+
+# Streamlit secrets (none used, but never commit these)
+.streamlit/secrets.toml

@@ -1,0 +1,9 @@
+streamlit>=1.32.0
+yt-dlp>=2024.4.9
+moonshine-voice>=0.0.62
+
+# NOTE: ffmpeg is a system binary and cannot be installed via pip.
+# On Streamlit Community Cloud, add a top-level "packages.txt" file containing
+# the single line "ffmpeg" so the platform installs it via apt.
+# On your own server/container, install it via your OS package manager
+# (e.g. `apt-get install ffmpeg` or `brew install ffmpeg`).

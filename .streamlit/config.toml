@@ -1,0 +1,22 @@
+[server]
+maxUploadSize = 25
+
+[theme]
+base = "light"
+backgroundColor = "#FAFAF8"
+secondaryBackgroundColor = "#F5F4F0"
+textColor = "#111111"
+primaryColor = "#111111"
+font = "Inter"
+
+[[theme.fontFaces]]
+family = "Inter"
+url = "https://cdn.jsdelivr.net/fontsource/fonts/inter:vf@latest/latin-wght-normal.woff2"
+weight = "100 900"
+style = "normal"
+
+[[theme.fontFaces]]
+family = "Geist"
+url = "https://cdn.jsdelivr.net/fontsource/fonts/geist:vf@latest/latin-wght-normal.woff2"
+weight = "100 900"
+style = "normal"
