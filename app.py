@@ -3,6 +3,7 @@
 Open-source · privacy-first · no account required.
 """
 
+import base64
 import os
 import shutil
 import subprocess
@@ -18,7 +19,16 @@ MAX_UPLOAD_BYTES = MAX_UPLOAD_MB * 1024 * 1024
 MAX_DURATION_SECONDS = 90
 SPEED_TO_ARCH = {"⚡ Fast": "tiny", "🎯 Accurate": "base"}
 
-st.set_page_config(page_title="ReelText — Reels into clean text", page_icon="📝", layout="centered")
+st.set_page_config(page_title="ReelText — Reels into clean text", page_icon="📝", layout="wide")
+
+# Subtle upload glyph for the dropzone (base64 so it survives Streamlit's sanitizer).
+_UPLOAD_SVG = (
+    "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='#9C9A91' "
+    "stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'>"
+    "<path d='M12 15V4'/><path d='m7 9 5-5 5 5'/>"
+    "<path d='M5 15v3a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3'/></svg>"
+)
+UPLOAD_ICON = "data:image/svg+xml;base64," + base64.b64encode(_UPLOAD_SVG.encode()).decode()
 
 # ── Design system ───────────────────────────────────────────────────────────--
 CSS = """
@@ -69,8 +79,8 @@ html, body, .stApp{background:var(--bg) !important; color:var(--text); font-fami
 [data-testid="stMarkdownContainer"] .rt-wordmark,
 [data-testid="stMarkdownContainer"] .rt-ready{font-family:var(--font-display) !important;}
 *{box-shadow:none;}
-.block-container{max-width:800px; padding-top:var(--s6) !important; padding-bottom:var(--s8) !important;
-  margin-inline:auto !important;}
+.block-container{max-width:1240px; padding-top:var(--s6) !important; padding-bottom:var(--s8) !important;
+  padding-left:var(--s7) !important; padding-right:var(--s7) !important; margin-inline:auto !important;}
 
 /* ── Header — logo anchored left for deliberate asymmetry ─────────────────── */
 .rt-header{display:flex; align-items:center; justify-content:flex-start; margin:0 0 var(--s7);}
@@ -82,10 +92,10 @@ html, body, .stApp{background:var(--bg) !important; color:var(--text); font-fami
 .rt-hero{display:flex; flex-direction:column; align-items:flex-start; text-align:left; margin-bottom:var(--s7);}
 .rt-eyebrow{font-size:.75rem; font-weight:600; letter-spacing:.2em; text-transform:uppercase;
   color:var(--text-3); margin:0 0 var(--s4);}
-.rt-headline{font-family:var(--font-display); font-weight:700; font-size:clamp(2.75rem,8vw,5.25rem);
-  line-height:1.02; letter-spacing:-.045em; color:var(--text); margin:0 0 var(--s4); max-width:16ch;}
-.rt-sub{font-size:1.125rem; line-height:1.55; letter-spacing:-.011em; color:var(--text-2);
-  max-width:46ch; margin:0;}
+.rt-headline{font-family:var(--font-display); font-weight:700; font-size:clamp(2.75rem,6vw,5.75rem);
+  line-height:1.01; letter-spacing:-.046em; color:var(--text); margin:0 0 var(--s4); max-width:18ch;}
+.rt-sub{font-size:1.1875rem; line-height:1.55; letter-spacing:-.011em; color:var(--text-2);
+  max-width:48ch; margin:0;}
 
 /* Signature marker — imperfect, hand-highlighted, revealed once on load */
 .rt-mark{position:relative; display:inline-block;}
@@ -157,42 +167,34 @@ button[data-baseweb="tab"][aria-selected="true"]{color:var(--text) !important;}
 [data-testid="stTextInput"] input:focus{border-color:var(--accent) !important;
   box-shadow:0 0 0 3px var(--accent-soft) !important; outline:none !important;}
 
-/* Upload dropzone — the dominant surface, with custom idle copy */
+/* Upload dropzone — clickable surface with a rich idle state */
 [data-testid="stFileUploaderDropzone"]{background:var(--bg-sunken) !important;
   border:1.5px dashed var(--border-2) !important; border-radius:var(--r-md) !important;
-  padding:var(--s6) var(--s5) !important; min-height:148px; cursor:pointer;
+  padding:var(--s6) var(--s4) !important; min-height:172px; cursor:pointer;
   display:flex !important; flex-direction:column !important; align-items:center !important;
-  justify-content:center !important; gap:var(--s3) !important; text-align:center;
+  justify-content:center !important; gap:var(--s2) !important; text-align:center;
   transition:border-color var(--base) var(--ease), background var(--base) var(--ease),
   box-shadow var(--base) var(--ease);}
-[data-testid="stFileUploaderDropzone"]:hover{border-color:var(--accent) !important;
-  background:#FBF7E6 !important;}
+[data-testid="stFileUploaderDropzone"]:hover{border-color:var(--accent) !important; background:#FBF7E6 !important;}
 [data-testid="stFileUploaderDropzone"]:focus-within{border-color:var(--accent) !important;
   background:#FBF7E6 !important; box-shadow:0 0 0 4px var(--accent-soft) !important;}
-/* custom idle copy (replaces the default size line) */
-[data-testid="stFileUploaderDropzoneInstructions"]{order:0; display:flex; flex-direction:column;
-  align-items:center; gap:var(--s1);}
+/* the whole zone is clickable via the overlay input → hide the native browse button */
+[data-testid="stFileUploaderDropzone"] > span{display:none !important;}
+/* subtle icon (background-image injected after this block) */
+[data-testid="stFileUploaderDropzone"]::before{content:""; order:0; width:30px; height:30px;
+  background-repeat:no-repeat; background-position:center; background-size:contain; opacity:.5;
+  margin-bottom:var(--s1);}
+/* idle copy */
+[data-testid="stFileUploaderDropzoneInstructions"]{order:1; display:flex; flex-direction:column;
+  align-items:center; gap:2px;}
 [data-testid="stFileUploaderDropzoneInstructions"] *{font-size:0 !important; line-height:0 !important;
   color:transparent !important;}
 [data-testid="stFileUploaderDropzoneInstructions"]::before{content:"Drop a Reel here"; display:block;
-  font-size:1.0625rem; font-weight:600; color:var(--text); letter-spacing:-.012em;}
-[data-testid="stFileUploaderDropzoneInstructions"]::after{content:"MP4 · MOV · up to 25 MB"; display:block;
-  font-size:.82rem; font-weight:500; color:var(--text-3); margin-top:var(--s1);}
-/* browse button → quiet ghost, relabelled */
-[data-testid="stFileUploaderDropzone"] > span{order:1;}
-[data-testid="stFileUploaderDropzone"] button[data-testid="stBaseButton-secondary"]{
-  background:var(--surface) !important; color:var(--text) !important;
-  border:1px solid var(--border-2) !important; border-radius:var(--r-sm) !important;
-  font-weight:600 !important; padding:8px 16px !important;
-  transition:background var(--fast) var(--ease), border-color var(--fast) var(--ease), transform var(--fast) var(--ease);}
-[data-testid="stFileUploaderDropzone"] button[data-testid="stBaseButton-secondary"] *{color:var(--text) !important;}
-[data-testid="stFileUploaderDropzone"] button[data-testid="stBaseButton-secondary"]:hover{
-  background:var(--accent-soft) !important; border-color:var(--accent) !important; transform:translateY(-1px);}
-[data-testid="stFileUploaderDropzone"] button [data-testid="stMarkdownContainer"] p{font-size:0 !important;}
-[data-testid="stFileUploaderDropzone"] button [data-testid="stMarkdownContainer"] p::after{
-  content:"Browse your device"; font-size:.9rem; font-weight:600; color:var(--text);}
-[data-testid="stFileUploaderDropzone"] [data-testid="stIconMaterial"]{color:var(--text-2) !important;
-  font-size:18px !important;}
+  font-size:1.1rem; font-weight:600; color:var(--text); letter-spacing:-.012em;}
+[data-testid="stFileUploaderDropzoneInstructions"]::after{content:"or paste an Instagram link"; display:block;
+  font-size:.9rem; font-weight:500; color:var(--text-3);}
+[data-testid="stFileUploaderDropzone"]::after{content:"Supports MP4, MOV · Up to 25 MB"; order:2;
+  font-size:.78rem; font-weight:500; color:var(--text-3); opacity:.85; margin-top:var(--s1);}
 
 /* Uploaded-file chip — quiet success */
 [data-testid="stFileUploaderFile"]{background:var(--surface) !important; border:1px solid var(--border) !important;
@@ -209,13 +211,14 @@ button[data-baseweb="tab"][aria-selected="true"]{color:var(--text) !important;}
 .stButton > button:hover{transform:translateY(-1px); box-shadow:var(--shadow-press) !important; background:#000 !important;}
 .stButton > button:active{transform:translateY(0); box-shadow:none !important;}
 
-/* Download buttons — quiet secondary */
-.stDownloadButton > button{background:var(--surface) !important; color:var(--text) !important; height:44px;
-  border:1px solid var(--border-2) !important; border-radius:var(--r-sm) !important; font-weight:600 !important;
-  transition:border-color var(--fast) var(--ease), background var(--fast) var(--ease), transform var(--fast) var(--ease);}
+/* Export buttons — strong, deliberate (outline that inverts on hover) */
+.stDownloadButton > button{background:var(--surface) !important; color:var(--text) !important; height:46px;
+  border:1.5px solid var(--text) !important; border-radius:var(--r-sm) !important; font-weight:700 !important;
+  letter-spacing:.02em;
+  transition:background var(--fast) var(--ease), color var(--fast) var(--ease), transform var(--fast) var(--ease);}
 .stDownloadButton > button *{color:var(--text) !important;}
-.stDownloadButton > button:hover{border-color:var(--text) !important; background:var(--bg-sunken) !important;
-  transform:translateY(-1px);}
+.stDownloadButton > button:hover{background:var(--text) !important; transform:translateY(-1px);}
+.stDownloadButton > button:hover *{color:#fff !important;}
 
 /* Body copy black; never override dark buttons / muted utility classes */
 div[data-testid="stMarkdownContainer"] p, div[data-testid="stMarkdownContainer"] li,
@@ -230,8 +233,14 @@ label, h1, h2, h3, h4{color:var(--text);}
 @keyframes rt-pop{from{transform:scale(.4); opacity:0;} to{transform:scale(1); opacity:1;}}
 .rt-ready{font-family:var(--font-display); font-weight:700; font-size:1.5rem; letter-spacing:-.03em; color:var(--text);}
 
-/* ── Transcript preview (below the fold; illustrative only) ───────────────--- */
-.rt-preview{margin-top:var(--s7); border:1px dashed var(--border-2); border-radius:var(--r-md);
+/* ── Two-column app shell: compact controls (left) + roomy output (right) ──--- */
+[data-testid="stColumn"] [data-testid="stVerticalBlockBorderWrapper"]:has(.rt-card-anchor){padding:var(--s5) !important;}
+.rt-controls-divider{height:1px; background:var(--border); margin:var(--s5) 0 var(--s4);}
+.rt-controls-label{font-size:.7rem; font-weight:600; letter-spacing:.14em; text-transform:uppercase;
+  color:var(--text-3); margin:var(--s4) 0 var(--s2);}
+
+/* ── Transcript preview (illustrative output, shown before generation) ─────--- */
+.rt-preview{border:1px dashed var(--border-2); border-radius:var(--r-md);
   background:var(--bg-sunken); padding:var(--s5);}
 .rt-preview-label{font-size:.72rem; font-weight:600; letter-spacing:.16em; text-transform:uppercase;
   color:var(--text-3); margin-bottom:var(--s4);}
@@ -279,6 +288,13 @@ a:focus-visible, button:focus-visible{outline:2.5px solid var(--accent); outline
   .rt-mark::before{clip-path:none !important;}
 }
 
+/* ── Responsive: stack the two-column shell below tablet ──────────────────--- */
+@media (max-width:900px){
+  .block-container{padding-left:var(--s5) !important; padding-right:var(--s5) !important;}
+  [data-testid="stHorizontalBlock"]{flex-direction:column !important; gap:var(--s5) !important;}
+  [data-testid="stColumn"]{width:100% !important; flex:1 1 100% !important;}
+}
+
 /* ── Handcrafted mobile ───────────────────────────────────────────────--- */
 @media (max-width:560px){
   .block-container{padding-left:var(--s4) !important; padding-right:var(--s4) !important;
@@ -296,6 +312,10 @@ a:focus-visible, button:focus-visible{outline:2.5px solid var(--accent); outline
 </style>
 """
 st.markdown(CSS, unsafe_allow_html=True)
+st.markdown(
+    f'<style>[data-testid="stFileUploaderDropzone"]::before{{background-image:url("{UPLOAD_ICON}");}}</style>',
+    unsafe_allow_html=True,
+)
 
 
 # ── Backend ────────────────────────────────────────────────────────────────--
@@ -471,108 +491,113 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# ── Tool card ─────────────────────────────────────────────────────────────--
+# ── Tool + transcript: width-using two-column app shell ───────────────────--
 up_go = url_go = False
 uploaded_file = None
 url_value = ""
 
-with st.container(border=True):
-    st.markdown('<span class="rt-card-anchor"></span>', unsafe_allow_html=True)
+col_controls, col_output = st.columns([5, 7], gap="large")
 
-    speed = st.segmented_control(
-        "Transcription speed",
-        options=list(SPEED_TO_ARCH.keys()),
-        default="⚡ Fast",
-        label_visibility="collapsed",
-        help="Fast is quicker with lighter accuracy. Accurate is slower but handles accents and noise better.",
-    ) or "⚡ Fast"
+with col_controls:
+    with st.container(border=True):
+        st.markdown('<span class="rt-card-anchor"></span>', unsafe_allow_html=True)
 
-    tab_upload, tab_url = st.tabs(["Upload Video", "Paste Reel URL"])
+        speed = st.segmented_control(
+            "Transcription speed",
+            options=list(SPEED_TO_ARCH.keys()),
+            default="⚡ Fast",
+            label_visibility="collapsed",
+            help="Fast is quicker with lighter accuracy. Accurate is slower but handles accents and noise better.",
+        ) or "⚡ Fast"
 
-    with tab_upload:
-        uploaded_file = st.file_uploader(
-            "Upload a video", type=["mp4", "mov"], label_visibility="collapsed"
-        )
-        if uploaded_file is not None and uploaded_file.size > MAX_UPLOAD_BYTES:
-            st.error(
-                f"This file is {uploaded_file.size / (1024 * 1024):.1f}MB — the limit is {MAX_UPLOAD_MB}MB."
+        tab_upload, tab_url = st.tabs(["Upload Video", "Paste Reel URL"])
+        with tab_upload:
+            uploaded_file = st.file_uploader(
+                "Upload a video", type=["mp4", "mov"], label_visibility="collapsed"
             )
-            uploaded_file = None
-        up_go = st.button("Get Transcript →", key="go_upload", use_container_width=True)
+            if uploaded_file is not None and uploaded_file.size > MAX_UPLOAD_BYTES:
+                st.error(
+                    f"This file is {uploaded_file.size / (1024 * 1024):.1f}MB — the limit is {MAX_UPLOAD_MB}MB."
+                )
+                uploaded_file = None
+            up_go = st.button("Get Transcript →", key="go_upload", use_container_width=True)
+        with tab_url:
+            st.caption("Paste a public Instagram Reel link. Nothing is stored — audio is processed and discarded.")
+            url_value = st.text_input(
+                "Reel URL", placeholder="https://www.instagram.com/reel/…", label_visibility="collapsed"
+            )
+            url_go = st.button("Get Transcript →", key="go_url", use_container_width=True)
 
-    with tab_url:
-        st.caption("Paste a public Instagram Reel link. Nothing is stored — audio is processed and discarded.")
-        url_value = st.text_input(
-            "Reel URL", placeholder="https://www.instagram.com/reel/…", label_visibility="collapsed"
+        # Run the pipeline here so the output column (rendered next) reflects new state
+        if up_go or url_go:
+            st.session_state.pop("tx", None)
+            st.session_state.pop("tx_fresh", None)
+            if up_go and uploaded_file is None:
+                st.error("Add a video file first (MP4 or MOV, up to 25MB).")
+            elif url_go and not url_value.strip():
+                st.error("Paste a Reel URL first.")
+            else:
+                result = process(speed, url=url_value.strip() if url_go else None,
+                                 uploaded_file=uploaded_file if up_go else None)
+                if result is not None and len(result) == 0:
+                    st.warning("Transcription finished, but no speech was detected in this video.")
+                elif result:
+                    st.session_state.tx = result
+                    st.session_state.tx_fresh = True
+
+        # Export + settings appear once a transcript exists
+        if "tx" in st.session_state:
+            lines = st.session_state.tx
+            st.markdown('<div class="rt-controls-divider"></div>', unsafe_allow_html=True)
+            st.markdown('<div class="rt-controls-label">Export</div>', unsafe_allow_html=True)
+            ex_txt, ex_srt = st.columns(2)
+            ex_txt.download_button(
+                "↓ TXT", data=to_plain(lines), file_name="transcript.txt",
+                mime="text/plain", use_container_width=True,
+            )
+            ex_srt.download_button(
+                "↓ SRT", data=to_srt(lines), file_name="transcript.srt",
+                mime="application/x-subrip", use_container_width=True,
+            )
+            st.markdown('<div class="rt-controls-label">Settings</div>', unsafe_allow_html=True)
+            st.toggle("Show timestamps", value=False, key="show_ts")
+
+with col_output:
+    if "tx" in st.session_state:
+        lines = st.session_state.tx
+        fresh = st.session_state.pop("tx_fresh", False)
+        check_cls = "rt-check draw" if fresh else "rt-check"
+        st.markdown(
+            f'<div class="rt-ready-wrap"><span class="{check_cls}"></span>'
+            f'<span class="rt-ready">Transcript ready</span></div>',
+            unsafe_allow_html=True,
         )
-        url_go = st.button("Get Transcript →", key="go_url", use_container_width=True)
-
-# ── Run pipeline ───────────────────────────────────────────────────────────--
-if up_go or url_go:
-    st.session_state.pop("tx", None)
-    st.session_state.pop("tx_fresh", None)
-    if up_go and uploaded_file is None:
-        st.error("Add a video file first (MP4 or MOV, up to 25MB).")
-    elif url_go and not url_value.strip():
-        st.error("Paste a Reel URL first.")
-    else:
-        result = process(speed, url=url_value.strip() if url_go else None,
-                         uploaded_file=uploaded_file if up_go else None)
-        if result is not None and len(result) == 0:
-            st.warning("Transcription finished, but no speech was detected in this video.")
-        elif result:
-            st.session_state.tx = result
-            st.session_state.tx_fresh = True
-
-# ── Transcript panel ───────────────────────────────────────────────────────--
-if "tx" in st.session_state:
-    lines = st.session_state.tx
-    fresh = st.session_state.pop("tx_fresh", False)
-    check_cls = "rt-check draw" if fresh else "rt-check"
-
-    st.markdown(
-        f'<div class="rt-ready-wrap"><span class="{check_cls}"></span>'
-        f'<span class="rt-ready">Transcript ready</span></div>',
-        unsafe_allow_html=True,
-    )
-
-    meta_col, toggle_col = st.columns([1, 1])
-    with meta_col:
         st.markdown(
             f'<div class="rt-meta">{word_count(lines)} words · {len(lines)} segments</div>',
             unsafe_allow_html=True,
         )
-    with toggle_col:
-        show_ts = st.toggle("Show timestamps", value=False)
-
-    body = to_timestamped(lines) if show_ts else to_plain(lines)
-    st.code(body, language=None, wrap_lines=True)
-
-    dl_txt, dl_srt = st.columns(2)
-    dl_txt.download_button(
-        "Download .txt", data=to_plain(lines), file_name="transcript.txt",
-        mime="text/plain", use_container_width=True,
-    )
-    dl_srt.download_button(
-        "Download .srt", data=to_srt(lines), file_name="transcript.srt",
-        mime="application/x-subrip", use_container_width=True,
-    )
-else:
-    # Below-the-fold: a static preview answering "what do I actually get?"
-    st.markdown(
-        """
-        <div class="rt-preview">
-          <div class="rt-preview-label">Transcript preview</div>
-          <div class="rt-preview-row"><span class="rt-preview-ts">00:00</span>
-            <span class="rt-preview-text">"Today I'm going to show you three small settings that
-            instantly make your footage look more cinematic…"</span></div>
-          <div class="rt-preview-row"><span class="rt-preview-ts">00:07</span>
-            <span class="rt-preview-text">"First, drop your shutter speed to double your frame rate —
-            that's the motion-blur trick the pros use."</span></div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+        show_ts = st.session_state.get("show_ts", False)
+        body = to_timestamped(lines) if show_ts else to_plain(lines)
+        st.code(body, language=None, wrap_lines=True)
+    else:
+        # Illustrative output so the right column answers "what do I get?" up front
+        st.markdown(
+            """
+            <div class="rt-preview">
+              <div class="rt-preview-label">Transcript preview</div>
+              <div class="rt-preview-row"><span class="rt-preview-ts">00:00</span>
+                <span class="rt-preview-text">"Today I'm going to show you three small settings that
+                instantly make your footage look more cinematic…"</span></div>
+              <div class="rt-preview-row"><span class="rt-preview-ts">00:07</span>
+                <span class="rt-preview-text">"First, drop your shutter speed to double your frame rate —
+                that's the motion-blur trick the pros use."</span></div>
+              <div class="rt-preview-row"><span class="rt-preview-ts">00:13</span>
+                <span class="rt-preview-text">"Then lock your white balance so the colors stop shifting
+                halfway through the clip."</span></div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
 # ── Footer ─────────────────────────────────────────────────────────────────--
 st.markdown(
